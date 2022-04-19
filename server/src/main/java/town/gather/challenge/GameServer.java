@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.java_websocket.WebSocket;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.enums.ReadyState;
@@ -20,6 +21,7 @@ import town.gather.challenge.domain.commands.PositionCommand;
 import town.gather.challenge.domain.game.GameState;
 import town.gather.challenge.domain.game.Position;
 
+@Slf4j
 public class GameServer extends WebSocketServer {
   private final GameState gameState;
   private final ReentrantLock lock;
@@ -33,30 +35,24 @@ public class GameServer extends WebSocketServer {
     this.otherGameServers = new LinkedList<>();
 
     for (URI uri : otherGameServerURIs) {
-      var client = new GameServerInternalClient(uri, this);
+      var client = new GameServerInternalClient(uri);
       this.otherGameServers.add(client);
     }
   }
 
   @Override
   public void onOpen(WebSocket connection, ClientHandshake handshake) {
-    System.out.println("GameServer::New connection to " + connection.getRemoteSocketAddress());
+    log.info("New connection to {}", connection.getRemoteSocketAddress());
   }
 
   @Override
   public void onClose(WebSocket connection, int code, String reason, boolean remote) {
-    System.out.println(
-        "GameServer::Closed "
-            + connection.getRemoteSocketAddress()
-            + " with exit code "
-            + code
-            + " additional info: "
-            + reason);
+    log.info("Closed {} with exit code {} additional info {}", connection.getRemoteSocketAddress(), code, reason);
 
     var playerAttached = (UUID) connection.getAttachment();
 
     if (playerAttached == null) {
-      System.out.println("GameServer::Cannot disconnect a player that never joined");
+      log.warn("Cannot disconnect a player that never joined");
       return;
     }
 
@@ -68,21 +64,17 @@ public class GameServer extends WebSocketServer {
 
   @Override
   public void onMessage(WebSocket connection, String message) {
-    System.out.println(
-        "GameServer::Received message from "
-            + connection.getRemoteSocketAddress()
-            + ": "
-            + message);
+    log.info("Received message [{}] from {}", message, connection.getRemoteSocketAddress());
     var maybeCommand = Command.fromString(message);
 
     if (maybeCommand.isEmpty()) {
-      System.out.println("GameServer::Command could not be processed");
+      log.error("Command could not be processed");
       return;
     }
 
     var command = maybeCommand.get();
 
-    System.out.println("GameServer::Received command: " + command);
+    log.info("Received command {}", command);
 
     switch (command.getType()) {
       case JOIN:
@@ -96,7 +88,7 @@ public class GameServer extends WebSocketServer {
         var maybePosition = this.gameState.moveToEmptyPosition(player);
 
         if (maybePosition.isEmpty()) {
-          System.out.println("GameServer::Could not add player to game because the map is full");
+          log.warn("Could not add player to game because the map is full");
           this.lock.unlock();
           return;
         }
@@ -106,12 +98,12 @@ public class GameServer extends WebSocketServer {
         var newPlayerPositionCommand =
             new PositionCommand(player, playerPosition.getX(), playerPosition.getY());
 
-        System.out.println("GameServer::Broadcast player join");
+        log.info("Broadcast player join");
         broadcast(newPlayerPositionCommand.toString());
 
         this.notifyPlayerPosition(player, playerPosition);
 
-        System.out.println("GameServer::Notify new player of other player positions");
+        log.info("Notify new player of other player positions");
         for (var position : allPlayerPositions) {
           var otherPlayerPositionCommand =
               new PositionCommand(position.getPlayer(), position.getX(), position.getY());
@@ -127,8 +119,8 @@ public class GameServer extends WebSocketServer {
         var playerAttached = (UUID) connection.getAttachment();
 
         if (playerAttached == null) {
-          System.out.println(
-              "GameServer::Player should attempt to join before they send move commands");
+          log.info(
+              "Player should attempt to join before they send move commands");
           this.lock.unlock();
           return;
         }
@@ -142,7 +134,7 @@ public class GameServer extends WebSocketServer {
           var positionCommandToBroadcast =
               new PositionCommand(playerAttached, nextPosition.getX(), nextPosition.getY());
 
-          System.out.println("GameServer::Broadcast player move");
+          log.info("Broadcast player move");
           broadcast(positionCommandToBroadcast.toString());
 
           this.notifyPlayerPosition(playerAttached, nextPosition);
@@ -165,39 +157,35 @@ public class GameServer extends WebSocketServer {
         break;
     }
 
-    System.out.println("GameServer::Processed command: " + command);
+    log.info("Processed command: {}", command);
   }
 
   @Override
   public void onError(WebSocket connection, Exception ex) {
-    System.err.println(
-        "GameServer::An error occurred on connection "
-            + connection.getRemoteSocketAddress()
-            + ":"
-            + ex);
+    log.error("An error occurred on connection: {}", connection.getRemoteSocketAddress(), ex);
   }
 
   @Override
   public void onStart() {
-    System.out.println("GameServer::Server started successfully");
+    log.info("Server started successfully");
   }
 
   private void forcePosition(UUID player, int x, int y) {
-    System.out.println("GameServer::Updating player to a new position");
+    log.info("Updating player to a new position");
     this.lock.lock();
 
     this.gameState.forcePosition(player, x, y);
 
     var positionCommandToBroadcast = new PositionCommand(player, x, y);
 
-    System.out.println("GameServer::Broadcast player move");
+    log.info("Broadcast player move");
     broadcast(positionCommandToBroadcast.toString());
 
     this.lock.unlock();
   }
 
   private void playerDisconnected(UUID player) {
-    System.out.println("GameServer::Updating player to a new position");
+    log.info("Updating player to a new position");
     this.lock.lock();
     this.disconnectPlayerLocally(player);
     this.lock.unlock();
@@ -205,7 +193,7 @@ public class GameServer extends WebSocketServer {
 
   private void disconnectPlayerLocally(UUID player) {
     if (this.gameState.removePlayer(player)) {
-      System.out.println("GameServer::Broadcasting player disconnect");
+      log.info("Broadcasting player disconnect");
       var dcCommand = new DisconnectCommand(player);
       broadcast(dcCommand.toString());
     }
@@ -234,11 +222,12 @@ public class GameServer extends WebSocketServer {
   private void verifyServerPoolConnection() {
     for (var server : this.otherGameServers) {
       this.lock.lock();
+
       if (server.getReadyState() != ReadyState.OPEN) {
-        System.out.println("GameServer::Reconnect needed");
+        log.info("Reconnect needed");
         server.connectBlocking();
-        System.out.println(server.getReadyState());
       }
+
       this.lock.unlock();
     }
   }
