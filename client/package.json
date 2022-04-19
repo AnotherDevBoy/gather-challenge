@@ -1,0 +1,12 @@
+{
+	"name": "distributed-system-onsite",
+	"version": "0.0.0",
+	"main": "client.js",
+	"repository": {
+		"type": "git"
+	},
+	"dependencies": {
+		"minimist": "^1.2.5",
+		"ws": "^7.4.4"
+	}
+}
