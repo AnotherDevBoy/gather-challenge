@@ -1,27 +1,39 @@
 package town.gather.challenge;
 
+import io.lettuce.core.RedisClient;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.utility.DockerImageName;
+import town.gather.challenge.api.GameWebSocketApi;
+import town.gather.challenge.domain.repository.RedisGameCommandQueue;
+import town.gather.challenge.worker.GameStateWorker;
 
 import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.List;
 
 @Slf4j
 public class App {
-  public static void main(String[] args) throws URISyntaxException, InterruptedException {
+  @SneakyThrows
+  public static void main(String[] args) {
+    var redis = new GenericContainer(DockerImageName.parse("redis:5.0.3-alpine"))
+            .withExposedPorts(6379);
+    redis.start();
+
     String host = "localhost";
 
-    var uri1 = new URI("ws://localhost:31415");
-    var uri2 = new URI("ws://localhost:31416");
-    var uri3 = new URI("ws://localhost:31417");
+
+    RedisClient redisClient = RedisClient.create(String.format("redis://%s:%s", redis.getHost(), redis.getFirstMappedPort()));
+
+    var commandQueue = new RedisGameCommandQueue(redisClient);
 
     Thread server1 =
-        new Thread(new GameServer(new InetSocketAddress(host, 31415), List.of(uri2, uri3)));
+        new Thread(new GameWebSocketApi(new InetSocketAddress(host, 31415), commandQueue));
     Thread server2 =
-        new Thread(new GameServer(new InetSocketAddress(host, 31416), List.of(uri1, uri3)));
+        new Thread(new GameWebSocketApi(new InetSocketAddress(host, 31416), commandQueue));
     Thread server3 =
-        new Thread(new GameServer(new InetSocketAddress(host, 31417), List.of(uri1, uri2)));
+        new Thread(new GameWebSocketApi(new InetSocketAddress(host, 31417), commandQueue));
+
+    Thread worker = new Thread(new GameStateWorker(commandQueue));
 
     log.info("Starting servers");
     server1.start();

@@ -16,6 +16,7 @@
     <lombok.version>1.18.22</lombok.version>
     <testcontainers.version>1.16.3</testcontainers.version>
     <log4j.version>2.17.2</log4j.version>
+    <lettuce.version>6.1.8.RELEASE </lettuce.version>
     <!-- Test dependencies -->
     <junit.version>5.8.2</junit.version>
     <mockito.version>4.4.0</mockito.version>
@@ -76,6 +77,11 @@
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-slf4j-impl</artifactId>
       <version>${log4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.lettuce</groupId>
+      <artifactId>lettuce-core</artifactId>
+      <version>${lettuce.version}</version>
     </dependency>
     <!-- Test dependencies -->
     <dependency>
