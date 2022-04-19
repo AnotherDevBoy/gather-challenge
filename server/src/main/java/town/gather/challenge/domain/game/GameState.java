@@ -1,12 +1,12 @@
 package town.gather.challenge.domain.game;
 
-import lombok.AccessLevel;
-import lombok.Getter;
+import com.google.common.collect.Sets;
 import town.gather.challenge.domain.commands.MoveDirection;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -14,36 +14,31 @@ import java.util.stream.IntStream;
 public class GameState {
   private final Position[][] map;
 
-  public GameState() {
+  private GameState() {
     this.map = new Position[20][20];
-    initializeMap();
+    IntStream.range(0, 20)
+        .forEach(i -> IntStream.range(0, 20).forEach(j -> this.map[i][j] = new Position(i, j)));
   }
 
-  private void initializeMap() {
-    IntStream.range(0, 20)
-        .forEach(
-            i -> {
-              IntStream.range(0, 20)
-                  .forEach(
-                      j -> {
-                        this.map[i][j] = new Position(i, j);
-                      });
-            });
+  public GameState(List<Position> players) {
+    this();
+
+    players.forEach(p -> this.map[p.getX()][p.getY()] = p);
   }
 
   public List<Position> getAllPlayerPositions() {
     return Arrays.stream(this.map)
-            .flatMap(Arrays::stream)
-            .filter(p -> p.getPlayer() != null)
-            .collect(Collectors.toList());
+        .flatMap(Arrays::stream)
+        .filter(p -> p.getPlayer() != null)
+        .collect(Collectors.toList());
   }
 
   public boolean removePlayer(UUID player) {
     var maybePlayerPosition =
-            Arrays.stream(this.map)
-                    .flatMap(Arrays::stream)
-                    .filter(p -> p.getPlayer() != null && p.getPlayer().equals(player))
-                    .findAny();
+        Arrays.stream(this.map)
+            .flatMap(Arrays::stream)
+            .filter(p -> p.getPlayer() != null && p.getPlayer().equals(player))
+            .findAny();
 
     if (maybePlayerPosition.isEmpty()) {
       return false;
@@ -57,7 +52,10 @@ public class GameState {
 
   public Optional<Position> moveToEmptyPosition(UUID player) {
     var maybeEmptyPosition =
-            Arrays.stream(this.map).flatMap(Arrays::stream).filter(p -> p.getPlayer() == null).findAny();
+        Arrays.stream(this.map)
+            .flatMap(Arrays::stream)
+            .filter(p -> p.getPlayer() == null)
+            .findAny();
 
     if (maybeEmptyPosition.isEmpty()) {
       return Optional.empty();
@@ -72,10 +70,10 @@ public class GameState {
 
   public Optional<Position> movePlayerInDirection(UUID player, MoveDirection direction) {
     var maybePlayerPosition =
-            Arrays.stream(this.map)
-                    .flatMap(Arrays::stream)
-                    .filter(p -> p.getPlayer() != null && p.getPlayer().equals(player))
-                    .findAny();
+        Arrays.stream(this.map)
+            .flatMap(Arrays::stream)
+            .filter(p -> p.getPlayer() != null && p.getPlayer().equals(player))
+            .findAny();
 
     if (maybePlayerPosition.isEmpty()) {
       return Optional.empty();
@@ -98,11 +96,41 @@ public class GameState {
     return Optional.of(nextPosition);
   }
 
+  public List<Position> playersThatJoined(GameState newState) {
+    var currentPlayers =
+        Arrays.stream(this.map)
+            .flatMap(Arrays::stream)
+            .filter(p -> p.getPlayer() != null)
+            .map(Position::getPlayer)
+            .collect(Collectors.toSet());
+    var newPlayers =
+        Arrays.stream(newState.map)
+            .flatMap(Arrays::stream)
+            .filter(p -> p.getPlayer() != null)
+            .map(Position::getPlayer)
+            .collect(Collectors.toSet());
+
+    Set<UUID> playersThatJoined = Sets.difference(newPlayers, currentPlayers);
+
+    return Arrays.stream(newState.map)
+        .flatMap(Arrays::stream)
+        .filter(p -> p.getPlayer() != null && playersThatJoined.contains(p.getPlayer()))
+        .collect(Collectors.toList());
+  }
+
+  public List<Position> playersThatDisconnected(GameState newState) {
+    return List.of();
+  }
+
+  public List<Position> playersThatMoved(GameState newState) {
+    return List.of();
+  }
+
   private boolean isWithinBoundaries(Position nextPosition) {
     return nextPosition.getX() >= 0
-            && nextPosition.getX() < 20
-            && nextPosition.getY() >= 0
-            && nextPosition.getY() < 20;
+        && nextPosition.getX() < 20
+        && nextPosition.getY() >= 0
+        && nextPosition.getY() < 20;
   }
 
   private static Position calculateNextPosition(Position position, MoveDirection direction) {
@@ -118,20 +146,5 @@ public class GameState {
     }
 
     throw new IllegalArgumentException();
-  }
-
-  public void forcePosition(UUID player, int x, int y) {
-    var maybePlayerPosition =
-            Arrays.stream(this.map)
-                    .flatMap(Arrays::stream)
-                    .filter(p -> p.getPlayer() != null && p.getPlayer().equals(player))
-                    .findAny();
-
-    if (maybePlayerPosition.isPresent()) {
-      var playerPosition = maybePlayerPosition.get();
-      this.map[playerPosition.getX()][playerPosition.getX()].setPlayer(null);
-    }
-
-    this.map[x][y].setPlayer(player);
   }
 }
