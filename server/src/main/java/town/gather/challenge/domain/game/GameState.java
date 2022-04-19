@@ -4,6 +4,7 @@ import com.google.common.collect.Sets;
 import town.gather.challenge.domain.commands.MoveDirection;
 
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -12,7 +13,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class GameState {
-  private final Position[][] map;
+  private Position[][] map;
 
   private GameState() {
     this.map = new Position[20][20];
@@ -119,11 +120,58 @@ public class GameState {
   }
 
   public List<Position> playersThatDisconnected(GameState newState) {
-    return List.of();
+    var currentPlayers =
+            Arrays.stream(this.map)
+                    .flatMap(Arrays::stream)
+                    .filter(p -> p.getPlayer() != null)
+                    .map(Position::getPlayer)
+                    .collect(Collectors.toSet());
+    var newPlayers =
+            Arrays.stream(newState.map)
+                    .flatMap(Arrays::stream)
+                    .filter(p -> p.getPlayer() != null)
+                    .map(Position::getPlayer)
+                    .collect(Collectors.toSet());
+
+    Set<UUID> playersThatDisconnected = Sets.difference(currentPlayers, newPlayers);
+
+    return Arrays.stream(this.map)
+            .flatMap(Arrays::stream)
+            .filter(p -> p.getPlayer() != null && playersThatDisconnected.contains(p.getPlayer()))
+            .collect(Collectors.toList());
   }
 
   public List<Position> playersThatMoved(GameState newState) {
-    return List.of();
+    var currentPlayers =
+            Arrays.stream(this.map)
+                    .flatMap(Arrays::stream)
+                    .filter(p -> p.getPlayer() != null)
+                    .map(Position::getPlayer)
+                    .collect(Collectors.toSet());
+    var newPlayers =
+            Arrays.stream(newState.map)
+                    .flatMap(Arrays::stream)
+                    .filter(p -> p.getPlayer() != null)
+                    .map(Position::getPlayer)
+                    .collect(Collectors.toSet());
+
+    Set<UUID> playersInBoth = Sets.intersection(currentPlayers, newPlayers);
+    List<Position> playersThatMoved = new LinkedList<>();
+
+    playersInBoth.forEach(player -> {
+      var oldPosition = Arrays.stream(this.map)
+              .flatMap(Arrays::stream)
+              .filter(p -> p.getPlayer() != null && p.getPlayer().equals(player)).findFirst().get();
+      var newPosition = Arrays.stream(newState.map)
+              .flatMap(Arrays::stream)
+              .filter(p -> p.getPlayer() != null && p.getPlayer().equals(player)).findFirst().get();
+
+      if (!oldPosition.equals(newPosition)) {
+        playersThatMoved.add(newPosition);
+      }
+    });
+
+    return playersThatMoved;
   }
 
   private boolean isWithinBoundaries(Position nextPosition) {
@@ -146,5 +194,9 @@ public class GameState {
     }
 
     throw new IllegalArgumentException();
+  }
+
+  public void update(GameState newState) {
+    this.map = newState.map;
   }
 }

@@ -4,9 +4,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.sync.RedisCommands;
-import java.util.List;
 import lombok.SneakyThrows;
 import town.gather.challenge.domain.game.Position;
+
+import java.util.List;
 
 public class RedisPlayerPositionRepository implements PlayerPositionRepository {
   private static final String PLAYER_POSITION_KEY = "players";
@@ -23,6 +24,10 @@ public class RedisPlayerPositionRepository implements PlayerPositionRepository {
   @SneakyThrows
   public List<Position> getPlayerPositions() {
     String serialized = (String) this.redisCommands.get(PLAYER_POSITION_KEY);
+
+    if (serialized == null) {
+      return List.of();
+    }
 
     return this.objectMapper.readValue(serialized, new TypeReference<>() {});
   }

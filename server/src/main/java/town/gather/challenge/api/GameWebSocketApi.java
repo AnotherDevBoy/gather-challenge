@@ -1,9 +1,5 @@
 package town.gather.challenge.api;
 
-import java.net.InetSocketAddress;
-import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
@@ -17,6 +13,11 @@ import town.gather.challenge.domain.game.GameState;
 import town.gather.challenge.domain.game.Position;
 import town.gather.challenge.domain.repository.commands.GameCommandQueue;
 import town.gather.challenge.domain.repository.gamestate.PlayerPositionRepository;
+
+import java.net.InetSocketAddress;
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class GameWebSocketApi extends WebSocketServer implements GameStateChangesObserver {
@@ -56,45 +57,49 @@ public class GameWebSocketApi extends WebSocketServer implements GameStateChange
 
   @Override
   public void onMessage(WebSocket connection, String message) {
-    log.info("Received message [{}] from {}", message, connection.getRemoteSocketAddress());
-    var maybeCommand = Command.fromString(message);
+    try {
+      log.info("Received message [{}] from {}", message, connection.getRemoteSocketAddress());
+      var maybeCommand = Command.fromString(message);
 
-    if (maybeCommand.isEmpty()) {
-      log.error("Command could not be processed");
-      return;
+      if (maybeCommand.isEmpty()) {
+        log.error("Command could not be processed");
+        return;
+      }
+
+      var command = maybeCommand.get();
+
+      log.info("Received command {}", command);
+
+      switch (command.getType()) {
+        case JOIN:
+          var joinCommand = (JoinCommand) command;
+          var player = joinCommand.getPlayer();
+
+          connection.setAttachment(player);
+
+          var allPlayerPositions = this.gameState.getAllPlayerPositions();
+
+          for (var position : allPlayerPositions) {
+            var otherPlayerPositionCommand =
+                    new PositionCommand(position.getPlayer(), position.getX(), position.getY());
+            connection.send(otherPlayerPositionCommand.toString());
+          }
+
+          this.gameCommandQueue.notifyPlayerJoined(player);
+          break;
+        case MOVE:
+          var moveCommand = (MoveCommand) command;
+
+          var playerAttached = (UUID) connection.getAttachment();
+
+          this.gameCommandQueue.notifyPlayerMovement(playerAttached, moveCommand.getDirection());
+          break;
+      }
+
+      log.info("Processed command: {}", command);
+    } catch (Exception e) {
+      log.error("An error occurred while processing message", e);
     }
-
-    var command = maybeCommand.get();
-
-    log.info("Received command {}", command);
-
-    switch (command.getType()) {
-      case JOIN:
-        var joinCommand = (JoinCommand) command;
-        var player = joinCommand.getPlayer();
-
-        connection.setAttachment(player);
-
-        var allPlayerPositions = this.gameState.getAllPlayerPositions();
-
-        for (var position : allPlayerPositions) {
-          var otherPlayerPositionCommand =
-              new PositionCommand(position.getPlayer(), position.getX(), position.getY());
-          connection.send(otherPlayerPositionCommand.toString());
-        }
-
-        this.gameCommandQueue.notifyPlayerJoined(player);
-        break;
-      case MOVE:
-        var moveCommand = (MoveCommand) command;
-
-        var playerAttached = (UUID) connection.getAttachment();
-
-        this.gameCommandQueue.notifyPlayerMovement(playerAttached, moveCommand.getDirection());
-        break;
-    }
-
-    log.info("Processed command: {}", command);
   }
 
   @Override

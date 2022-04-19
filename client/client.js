@@ -4,7 +4,7 @@ const argv = require("minimist")(process.argv.slice(2));
 
 // constants
 const N = 20;
-const PORTS = [31416, 31415, 31417];
+const PORTS = [31415, 31416, 31417];
 let silentMode = argv.s;
 
 // a few utils
@@ -232,7 +232,6 @@ const testAllPortsNPlayers = async (numPlayers, ports) => {
 
 	await sleep(5000);
 
-  console.log("HERE");
 	checkStateMatches(); // should all be the same after init
 
 	for (let i = 0; i < 100; i++) {
@@ -248,7 +247,6 @@ const testAllPortsNPlayers = async (numPlayers, ports) => {
 	await sleep(3000); // give things a bit to settle down
 
 	// check that all state matches
-  console.log("HERE");
 	checkStateMatches();
 
 	// do it again!

@@ -1,16 +1,16 @@
 package town.gather.challenge.domain.repository.commands;
 
-import io.lettuce.core.KeyValue;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.sync.RedisCommands;
-import java.util.Optional;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import town.gather.challenge.domain.commands.MoveDirection;
 import town.gather.challenge.domain.repository.commands.dto.GameCommandNotification;
 import town.gather.challenge.domain.repository.commands.dto.PlayerDisconnectedNotification;
 import town.gather.challenge.domain.repository.commands.dto.PlayerJoinedNotification;
 import town.gather.challenge.domain.repository.commands.dto.PlayerMovementNotification;
+
+import java.util.Optional;
+import java.util.UUID;
 
 @RequiredArgsConstructor
 public class RedisGameCommandQueue implements GameCommandQueue {
@@ -20,7 +20,9 @@ public class RedisGameCommandQueue implements GameCommandQueue {
   private final RedisCommands redisCommands;
 
   public RedisGameCommandQueue(RedisClient redisClient) {
-    this.redisCommands = redisClient.connect().sync();
+    var connect = redisClient.connect();
+    connect.setAutoFlushCommands(true);
+    this.redisCommands = connect.sync();
   }
 
   @Override
@@ -37,14 +39,18 @@ public class RedisGameCommandQueue implements GameCommandQueue {
   @Override
   public void notifyPlayerMovement(UUID playerAttached, MoveDirection direction) {
     this.redisCommands.rpush(
-        COMMAND_LIST_NAME, new PlayerMovementNotification(playerAttached, direction));
+        COMMAND_LIST_NAME, new PlayerMovementNotification(playerAttached, direction).toString());
   }
 
   @Override
   public Optional<GameCommandNotification> poll() {
-    KeyValue<String, String> commands =
+    var commands =
         this.redisCommands.blpop(SECONDS_TO_WAIT, COMMAND_LIST_NAME);
 
-    return GameCommandNotification.fromString(commands.getValue());
+    if (commands == null) {
+      return Optional.empty();
+    }
+
+    return GameCommandNotification.fromString((String) commands.getValue());
   }
 }

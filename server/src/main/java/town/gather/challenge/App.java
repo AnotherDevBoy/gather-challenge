@@ -25,27 +25,27 @@ public class App {
     RedisClient redisClient =
         RedisClient.create(
             String.format("redis://%s:%s", redis.getHost(), redis.getFirstMappedPort()));
-
-    var playerRepository = new RedisPlayerPositionRepository(redisClient);
-    var commandQueue = new RedisGameCommandQueue(redisClient);
+    log.info("Starting Redis on port {}", redis.getFirstMappedPort());
 
     Thread server1 =
         new Thread(
             new GameWebSocketApi(
-                new InetSocketAddress(host, 31415), playerRepository, commandQueue));
+                new InetSocketAddress(host, 31415), new RedisPlayerPositionRepository(redisClient), new RedisGameCommandQueue(redisClient)));
     Thread server2 =
         new Thread(
             new GameWebSocketApi(
-                new InetSocketAddress(host, 31416), playerRepository, commandQueue));
+                new InetSocketAddress(host, 31416), new RedisPlayerPositionRepository(redisClient), new RedisGameCommandQueue(redisClient)));
     Thread server3 =
         new Thread(
             new GameWebSocketApi(
-                new InetSocketAddress(host, 31417), playerRepository, commandQueue));
+                new InetSocketAddress(host, 31417), new RedisPlayerPositionRepository(redisClient), new RedisGameCommandQueue(redisClient)));
 
-    Thread worker = new Thread(new GameStateWorker(playerRepository, commandQueue));
+    Thread worker = new Thread(new GameStateWorker(new RedisPlayerPositionRepository(redisClient), new RedisGameCommandQueue(redisClient)));
 
     log.info("Starting servers");
     server1.start();
+    server2.start();
+    server3.start();
     worker.start();
   }
 }

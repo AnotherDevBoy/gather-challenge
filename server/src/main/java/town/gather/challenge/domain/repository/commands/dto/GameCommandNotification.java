@@ -1,10 +1,12 @@
 package town.gather.challenge.domain.repository.commands.dto;
 
-import java.util.Optional;
-import java.util.UUID;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import town.gather.challenge.domain.commands.CommandType;
+import town.gather.challenge.domain.commands.MoveDirection;
+
+import java.util.Optional;
+import java.util.UUID;
 
 @Getter
 @RequiredArgsConstructor
@@ -20,6 +22,10 @@ public abstract class GameCommandNotification {
     switch (type) {
       case DC:
         return Optional.of(new PlayerDisconnectedNotification(UUID.fromString(tokens[1])));
+      case JOIN:
+        return Optional.of(new PlayerJoinedNotification(UUID.fromString(tokens[1])));
+      case MOVE:
+        return Optional.of(new PlayerMovementNotification(UUID.fromString(tokens[1]), MoveDirection.valueOf(tokens[2])));
     }
 
     return Optional.empty();

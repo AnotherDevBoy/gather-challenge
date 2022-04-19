@@ -1,12 +1,13 @@
 package town.gather.challenge.domain.repository.commands.dto;
 
-import java.util.UUID;
 import lombok.Getter;
 import town.gather.challenge.domain.commands.CommandType;
 
+import java.util.UUID;
+
 @Getter
 public class PlayerDisconnectedNotification
-    extends town.gather.challenge.domain.repository.commands.dto.GameCommandNotification {
+    extends GameCommandNotification {
   private final UUID player;
 
   public PlayerDisconnectedNotification(UUID player) {

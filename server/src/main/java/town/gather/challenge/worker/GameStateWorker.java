@@ -1,6 +1,5 @@
 package town.gather.challenge.worker;
 
-import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import town.gather.challenge.domain.game.GameState;
 import town.gather.challenge.domain.game.Position;
@@ -9,6 +8,8 @@ import town.gather.challenge.domain.repository.commands.dto.PlayerDisconnectedNo
 import town.gather.challenge.domain.repository.commands.dto.PlayerJoinedNotification;
 import town.gather.challenge.domain.repository.commands.dto.PlayerMovementNotification;
 import town.gather.challenge.domain.repository.gamestate.PlayerPositionRepository;
+
+import java.util.List;
 
 @Slf4j
 public class GameStateWorker implements Runnable {
@@ -28,54 +29,64 @@ public class GameStateWorker implements Runnable {
 
   @Override
   public void run() {
+    log.info("Starting GameStateWorker");
+
     while (true) {
-      var maybeCommand = this.queue.poll();
+      try {
+        var maybeCommand = this.queue.poll();
 
-      if (maybeCommand.isEmpty()) {
-        continue;
-      }
+        if (maybeCommand.isEmpty()) {
+          continue;
+        }
 
-      var commandNotification = maybeCommand.get();
+        log.info("Received command");
+        var commandNotification = maybeCommand.get();
 
-      List<Position> playerPositions = null;
+        List<Position> playerPositions = null;
 
-      switch (commandNotification.getType()) {
-        case JOIN:
-          PlayerJoinedNotification joined = (PlayerJoinedNotification) commandNotification;
-          var emptyPosition = this.gameState.moveToEmptyPosition(joined.getPlayer());
+        switch (commandNotification.getType()) {
+          case JOIN:
+            log.info("Processing join command notification");
+            PlayerJoinedNotification joined = (PlayerJoinedNotification) commandNotification;
+            var emptyPosition = this.gameState.moveToEmptyPosition(joined.getPlayer());
 
-          if (emptyPosition.isEmpty()) {
-            log.warn("Could not add player to game because the map is full");
+            if (emptyPosition.isEmpty()) {
+              log.warn("Could not add player to game because the map is full");
+              break;
+            }
+
+            playerPositions = this.gameState.getAllPlayerPositions();
             break;
-          }
+          case MOVE:
+            log.info("Processing move command notification");
+            PlayerMovementNotification move = (PlayerMovementNotification) commandNotification;
 
-          playerPositions = this.gameState.getAllPlayerPositions();
-          break;
-        case MOVE:
-          PlayerMovementNotification move = (PlayerMovementNotification) commandNotification;
+            var maybeNextPosition =
+                    this.gameState.movePlayerInDirection(move.getPlayer(), move.getMoveDirection());
 
-          var maybeNextPosition =
-              this.gameState.movePlayerInDirection(move.getPlayer(), move.getMoveDirection());
+            if (maybeNextPosition.isPresent()) {
+              playerPositions = this.gameState.getAllPlayerPositions();
+            } else {
+              log.info("Couldn't move player to the desired location");
+            }
 
-          if (maybeNextPosition.isPresent()) {
-            playerPositions = this.gameState.getAllPlayerPositions();
-          } else {
-            log.info("Couldn't move player to the desired location");
-          }
+            break;
+          case DC:
+            log.info("Processing dc command notification");
+            PlayerDisconnectedNotification dc = (PlayerDisconnectedNotification) commandNotification;
 
-          break;
-        case DC:
-          PlayerDisconnectedNotification dc = (PlayerDisconnectedNotification) commandNotification;
+            if (this.gameState.removePlayer(dc.getPlayer())) {
+              playerPositions = this.gameState.getAllPlayerPositions();
+            }
+            break;
+        }
 
-          if (this.gameState.removePlayer(dc.getPlayer())) {
-            playerPositions = this.gameState.getAllPlayerPositions();
-          }
-          break;
-      }
-
-      // This means the game state has been modified and needs to be persisted
-      if (playerPositions != null) {
-        this.playerPositionRepository.updatePlayerPositions(playerPositions);
+        // This means the game state has been modified and needs to be persisted
+        if (playerPositions != null) {
+          this.playerPositionRepository.updatePlayerPositions(playerPositions);
+        }
+      } catch (Exception e) {
+        log.error("The worker almost crashed", e);
       }
     }
   }
