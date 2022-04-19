@@ -36,8 +36,6 @@ public class GameState {
   }
 
   public boolean removePlayer(UUID player) {
-    // this.lock.lock();
-
     var maybePlayerPosition =
         Arrays.stream(map)
             .flatMap(Arrays::stream)
@@ -45,23 +43,20 @@ public class GameState {
             .findAny();
 
     if (maybePlayerPosition.isEmpty()) {
-      // this.lock.unlock();
       return false;
     }
 
     var position = maybePlayerPosition.get();
     this.map[position.getX()][position.getY()].setPlayer(null);
-    // this.lock.unlock();
+
     return true;
   }
 
   public Optional<Position> moveToEmptyPosition(UUID player) {
-    // this.lock.lock();
     var maybeEmptyPosition =
         Arrays.stream(map).flatMap(Arrays::stream).filter(p -> p.getPlayer() == null).findAny();
 
     if (maybeEmptyPosition.isEmpty()) {
-      // this.lock.unlock();
       return Optional.empty();
     }
 
@@ -69,12 +64,10 @@ public class GameState {
 
     this.map[position.getX()][position.getY()].setPlayer(player);
 
-    // this.lock.unlock();
     return Optional.of(position);
   }
 
   public Optional<Position> movePlayerInDirection(UUID player, MoveDirection direction) {
-    // this.lock.lock();
     var maybePlayerPosition =
         Arrays.stream(map)
             .flatMap(Arrays::stream)
@@ -82,8 +75,6 @@ public class GameState {
             .findAny();
 
     if (maybePlayerPosition.isEmpty()) {
-      // Player not found in the map
-      // this.lock.unlock();
       return Optional.empty();
     }
 
@@ -91,21 +82,16 @@ public class GameState {
     var nextPosition = calculateNextPosition(playerPosition, direction);
 
     if (!isWithinBoundaries(nextPosition)) {
-      // The next position is outside the map
-      // this.lock.unlock();
       return Optional.empty();
     }
 
     if (this.map[nextPosition.getX()][nextPosition.getY()].getPlayer() != null) {
-      // Can't move to a position where there is already another player
-      // this.lock.unlock();
       return Optional.empty();
     }
 
     this.map[playerPosition.getX()][playerPosition.getY()].setPlayer(null);
     this.map[nextPosition.getX()][nextPosition.getY()].setPlayer(player);
 
-    // this.lock.unlock();
     return Optional.of(nextPosition);
   }
 

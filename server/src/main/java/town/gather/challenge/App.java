@@ -1,10 +1,13 @@
 package town.gather.challenge;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 
+@Slf4j
 public class App {
   public static void main(String[] args) throws URISyntaxException, InterruptedException {
     String host = "localhost";
@@ -20,6 +23,7 @@ public class App {
     Thread server3 =
         new Thread(new GameServer(new InetSocketAddress(host, 31417), List.of(uri1, uri2)));
 
+    log.info("Starting servers");
     server1.start();
     server2.start();
     server3.start();

@@ -1,31 +1,34 @@
 package town.gather.challenge;
 
 import java.net.URI;
+
+import lombok.extern.slf4j.Slf4j;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
+@Slf4j
 public class GameServerInternalClient extends WebSocketClient {
-  public GameServerInternalClient(URI serverUri, GameServer gameServer) {
+  public GameServerInternalClient(URI serverUri) {
     super(serverUri);
   }
 
   @Override
   public void onOpen(ServerHandshake serverHandshake) {
-    System.out.println("Client::New connection opened");
+    log.info("New connection opened");
   }
 
   @Override
   public void onMessage(String message) {
-    System.out.println("Client::Received message " + message);
+    log.info("Received message {}", message);
   }
 
   @Override
   public void onClose(int code, String reason, boolean remote) {
-    System.out.println("Client::Closed with exit code " + code + " additional info: " + reason);
+    log.info("Closed with exit code {}. Additional info: {}", code,  reason);
   }
 
   @Override
   public void onError(Exception ex) {
-    System.err.println("Client::An error occurred:" + ex);
+    log.error("An error occurred", ex);
   }
 }
